@@ -1,9 +1,16 @@
+import io
 import os
 import requests
 from bs4 import BeautifulSoup
+from PIL import Image
+
+from benchmark import Benchmark
 
 # Base URL for the Pokémon page on Bulbapedia
 baseURL = "https://archives.bulbagarden.net/wiki/"
+
+bm = Benchmark()
+bm.start()
 
 # Fetching the list of Pokémon from the PokeAPI
 pokeapi_url = "https://pokeapi.co/api/v2/pokemon?limit=151&offset=0"
@@ -52,14 +59,12 @@ def fetch():
                     # Construct the path where the image will be saved
                     pokemon_dir = os.path.join(image_directory_name, pokemonName.lower().replace(' ', '_'))
                     os.makedirs(pokemon_dir, exist_ok=True)  # Create the directory if it doesn't exist
-                    image_path = os.path.join(pokemon_dir, f"{image_count}.jpg")  # Assuming.jpg extension
 
-                    # Download and save the image
+                    # Directly convert the image to PNG without saving as JPG
                     image_response = requests.get(src)
-                    with open(image_path, 'wb') as file:
-                        file.write(image_response.content)
-
-                    print(f"Image saved to {image_path}")
+                    img = Image.open(io.BytesIO(image_response.content))
+                    png_path = os.path.join(pokemon_dir, f"{image_count}.png")
+                    img.save(png_path, "PNG")
 
                     image_count += 1  # Increment the counter for each image fetched
 
@@ -73,3 +78,6 @@ def fetch():
 
 if __name__ == "__main__":
     fetch()
+
+bm.stop()
+bm.print()
