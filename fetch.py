@@ -13,7 +13,7 @@ bm = Benchmark()
 bm.start()
 
 # Fetching the list of Pokémon from the PokeAPI
-pokeapi_url = "https://pokeapi.co/api/v2/pokemon?limit=151&offset=0"
+pokeapi_url = "https://pokeapi.co/api/v2/pokemon?limit=1025&offset=0"
 pokeapi_response = requests.get(pokeapi_url)
 pokeapi_data = pokeapi_response.json()
 
@@ -27,6 +27,8 @@ def fetch():
     if pokeapi_response.status_code == 200:
         # Extracting the names of the Pokémon
         names = [pokemon['name'] for pokemon in pokeapi_data['results']]
+
+        print(len(names))
 
         # Ensure the 'image_directory_name' directory exists
         if not os.path.exists(image_directory_name):
