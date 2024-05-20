@@ -1,8 +1,7 @@
 # PokeFetch
 The image fetcher behind the [Volt](https://github.com/Volt-Team/Volt) Pokémon GO bot.
 
-# WARNING
-This effectively DDOS'es the bulbgarden website. BE WARNED.
+# WARNING: This effectively DDOS'es the bulbgarden website. BE WARNED.
 
 ## Usage
 
