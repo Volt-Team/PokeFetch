@@ -1,6 +1,5 @@
 import json
 import shutil
-
 import aiohttp
 import asyncio
 import os
@@ -43,12 +42,19 @@ async def fetch_images_for_pokemon(session, pokemon_name):
                 margin_tag = thumb_tag.find("div", style=lambda value: value and "margin:" in value)
                 image = margin_tag.find("img", {"alt": ""})
                 src = image["src"]
+                # Check if the image is either JPG or PNG
+                if not (src.endswith(".png") or src.endswith(".jpg")):
+                    print(f"Skipping", src)
+                    continue
+
                 pokemon_dir = os.path.join(image_directory, pokemon_name.lower().replace(' ', '_'))
                 os.makedirs(pokemon_dir, exist_ok=True)
                 async with session.get(src) as image_response:
                     img = Image.open(BytesIO(await image_response.read()))
-                    png_path = os.path.join(pokemon_dir, f"{image_count}.png")
-                    img.save(png_path, "PNG")
+                    img_path = os.path.join(pokemon_dir, f"{image_count}.png")
+                    rgba_img = img.convert("RGBA")
+                    rgba_img.save(img_path)
+                    print(img_path, rgba_img.format)
                     image_count += 1
                     if image_count >= images_per_pokemon:
                         break
