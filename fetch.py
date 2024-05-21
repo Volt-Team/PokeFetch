@@ -1,85 +1,83 @@
-import io
+import json
+import shutil
+
+import aiohttp
+import asyncio
 import os
-import requests
 from bs4 import BeautifulSoup
 from PIL import Image
+from io import BytesIO
 
 from benchmark import Benchmark
 
 # Base URL for the Pokémon page on Bulbapedia
 baseURL = "https://archives.bulbagarden.net/wiki/"
 
-bm = Benchmark()
-bm.start()
-
 # Fetching the list of Pokémon from the PokeAPI
 pokeapi_url = "https://pokeapi.co/api/v2/pokemon?limit=1025&offset=0"
-pokeapi_response = requests.get(pokeapi_url)
-pokeapi_data = pokeapi_response.json()
 
-images_per_pokemon = 7
+with open("config.json", "r") as config_file:
+    config = json.load(config_file)
 
-image_directory_name = "image_data"
+image_directory = config["image_directory"]
+images_per_pokemon = config["images_per_pokemon"]
+clear_image_directory = config["clear_image_directory"]
 
 
-def fetch():
-    # Check if the request was successful
-    if pokeapi_response.status_code == 200:
-        # Extracting the names of the Pokémon
-        names = [pokemon['name'] for pokemon in pokeapi_data['results']]
+async def fetch_pokemon_names(session):
+    async with session.get(pokeapi_url) as response:
+        return await response.json()
 
-        print(len(names))
 
-        # Ensure the 'image_directory_name' directory exists
-        if not os.path.exists(image_directory_name):
-            os.makedirs(image_directory_name)
-
-        for pokemonName in names:
-            url = baseURL + "Category:" + pokemonName.replace(' ', '_')
-            print(url)
-
-            response = requests.get(url=url)
-
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "html.parser")
-
-                img_tags = soup.find_all("li", {"class": "gallerybox"})
-
-                image_count = 0  # Initialize the counter for images per Pokémon
-
-                for tag in img_tags:
-                    width_tag = tag.find("div", style=lambda value: value and "width: 155px" in value)
-
-                    thumb_tag = width_tag.find("div", {"class": "thumb"})
-
-                    margin_tag = thumb_tag.find("div", style=lambda value: value and "margin:" in value)
-
-                    image = margin_tag.find("img", {"alt": ""})
-
-                    src = image["src"]
-
-                    # Construct the path where the image will be saved
-                    pokemon_dir = os.path.join(image_directory_name, pokemonName.lower().replace(' ', '_'))
-                    os.makedirs(pokemon_dir, exist_ok=True)  # Create the directory if it doesn't exist
-
-                    # Directly convert the image to PNG without saving as JPG
-                    image_response = requests.get(src)
-                    img = Image.open(io.BytesIO(image_response.content))
+async def fetch_images_for_pokemon(session, pokemon_name):
+    url = baseURL + "Category:" + pokemon_name.replace(' ', '_')
+    async with session.get(url) as response:
+        if response.status == 200:
+            print(f"Fetching", pokemon_name)
+            soup = BeautifulSoup(await response.text(), "html.parser")
+            img_tags = soup.find_all("li", {"class": "gallerybox"})
+            image_count = 0
+            for tag in img_tags:
+                width_tag = tag.find("div", style=lambda value: value and "width: 155px" in value)
+                thumb_tag = width_tag.find("div", {"class": "thumb"})
+                margin_tag = thumb_tag.find("div", style=lambda value: value and "margin:" in value)
+                image = margin_tag.find("img", {"alt": ""})
+                src = image["src"]
+                pokemon_dir = os.path.join(image_directory, pokemon_name.lower().replace(' ', '_'))
+                os.makedirs(pokemon_dir, exist_ok=True)
+                async with session.get(src) as image_response:
+                    img = Image.open(BytesIO(await image_response.read()))
                     png_path = os.path.join(pokemon_dir, f"{image_count}.png")
                     img.save(png_path, "PNG")
-
-                    image_count += 1  # Increment the counter for each image fetched
-
-                    if image_count >= images_per_pokemon:  # Stop fetching images once 7 have been fetched
+                    image_count += 1
+                    if image_count >= images_per_pokemon:
                         break
-            else:
-                print(f"Failed to open {url}")
-    else:
-        print(f"Failed to open {pokeapi_url}")
+        else:
+            print(f"Failed to open {url}")
 
+
+async def main():
+    async with aiohttp.ClientSession() as session:
+        pokeapi_data = await fetch_pokemon_names(session)
+        names = [pokemon['name'] for pokemon in pokeapi_data['results']]
+        print(f"Pokemon:", len(names))
+
+        if clear_image_directory and os.path.exists(image_directory):
+            print("Cleaning image directory")
+            shutil.rmtree(image_directory)
+
+        if not os.path.exists(image_directory):
+            os.makedirs(image_directory)
+
+        tasks = []
+        for pokemonName in names:
+            task = asyncio.create_task(fetch_images_for_pokemon(session, pokemonName))
+            tasks.append(task)
+        await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    fetch()
-
-bm.stop()
-bm.print()
+    bm = Benchmark()
+    bm.start()
+    asyncio.run(main())
+    bm.stop()
+    bm.print()

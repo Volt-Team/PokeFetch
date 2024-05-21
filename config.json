@@ -1,0 +1,5 @@
+{
+  "image_directory": "image_data",
+  "images_per_pokemon": 8,
+  "clear_image_directory": true
+}
